@@ -1,12 +1,8 @@
 [build]
-target = "thumbv7em-none-eabi"
+target = "thumbv7em-none-eabihf"
 
 [target.thumbv7em-none-eabihf]
 rustflags = ["-C", "link-arg=-Tlink.x", "-C", "link-arg=-Tdefmt.x"]
 
 [target.'cfg(all(target_arch = "arm", target_os = "none"))']
-# replace nRF82833_xxAA with your chip as listed in `probe-rs chip list`
 runner = "probe-rs run --chip nRF52833_xxAA"
-
-[env]
-DEFMT_LOG = "trace"

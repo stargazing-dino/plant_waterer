@@ -824,6 +824,7 @@ dependencies = [
  "defmt",
  "defmt-rtt",
  "embassy-executor",
+ "embassy-futures",
  "embassy-nrf 0.2.0",
  "embassy-time",
  "embedded-hal 1.0.0",
