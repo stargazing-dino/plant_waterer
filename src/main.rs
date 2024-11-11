@@ -2,8 +2,8 @@
 #![no_main]
 
 use embassy_executor::Spawner;
+use embassy_nrf::*;
 use embassy_time::Timer;
-use microbit_bsp::*;
 use {defmt_rtt as _, panic_probe as _};
 
 #[embassy_executor::main]

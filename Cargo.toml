@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 cortex-m = { version = "0.7.7", features = ["critical-section-single-core"] }
-cortex-m-rt = "0.7.3"
+cortex-m-rt = "0.7.5"
 panic-probe = { version = "0.3", features = ["print-defmt"] }
 defmt-rtt = "0.4.1"
 defmt = "0.3.8"
@@ -18,7 +18,7 @@ embassy-nrf = { version = "0.2.0", features = [
     "unstable-pac",
     "time",
 ] }
-embassy-executor = { version = "0.6.0", features = [
+embassy-executor = { version = "0.6.2", features = [
     "task-arena-size-4096",
     "arch-cortex-m",
     "executor-thread",
@@ -30,5 +30,4 @@ embassy-time = { version = "0.3.2", features = [
     "defmt",
     "defmt-timestamp-uptime",
 ] }
-microbit-bsp = "0.3.0"
 embassy-futures = "0.1.1"
