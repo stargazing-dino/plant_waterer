@@ -1,6 +1,11 @@
 [workspace]
 resolver = "2"
-members = ["src/01-minimal", "src/02-pump-control", "src/03-microbit-bsp"]
+members = [
+    "src/01-minimal",
+    "src/02-pump-control",
+    "src/03-bsp-audio",
+    "src/04-bsp-display",
+]
 
 [workspace.package]
 version = "0.1.0"
@@ -34,4 +39,7 @@ embassy-time = { version = "0.3.2", features = [
     "defmt",
     "defmt-timestamp-uptime",
 ] }
+embassy-futures = "0.1.1"
+
+# bsp dependencies
 microbit-bsp = { git = "https://github.com/lulf/microbit-bsp.git" }
