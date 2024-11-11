@@ -1,7 +1,8 @@
 [package]
-name = "minimal"
+name = "pump-control"
 version = "0.1.0"
 edition = "2021"
+
 
 [dependencies]
 cortex-m = { workspace = true }

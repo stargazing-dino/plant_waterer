@@ -1,0 +1,1 @@
+probe-rs erase --chip nrf52833_xxAA --allow-erase-all
