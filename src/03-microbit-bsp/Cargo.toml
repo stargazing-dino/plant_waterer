@@ -1,5 +1,5 @@
 [package]
-name = "pump-control"
+name = "bsp-audio"
 version = "0.1.0"
 edition = "2021"
 
@@ -10,5 +10,5 @@ cortex-m-rt = { workspace = true }
 panic-probe = { workspace = true }
 defmt = { workspace = true }
 defmt-rtt = { workspace = true }
-embassy-nrf = { workspace = true }
+microbit-bsp = { workspace = true }
 embassy-executor = { workspace = true }
