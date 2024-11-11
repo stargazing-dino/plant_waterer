@@ -1,0 +1,22 @@
+{
+  "$schema": "https://aka.ms/codetour-schema",
+  "title": "1: Intro",
+  "steps": [
+    {
+      "file": "src/main.rs",
+      "description": "# No Standard Library!\n\nThe #![no_std] attribute is used to indicate that the Rust program should not link the standard library, which is useful for embedded systems or environments where the standard library is not available. This allows the program to run on bare-metal hardware with limited resources.\n\n![Image](https://github.com/microsoft/codetour/raw/HEAD/icon.png)",
+      "line": 1
+    },
+    {
+      "file": "memory.x",
+      "description": "The Nordic 52840 chip has 512kb of flash and 128k of ram.",
+      "line": 1
+    },
+    {
+      "file": "src/main.rs",
+      "description": "Embassy NRF is a HAL that uses embedded_hal. It is a driver of sorts.",
+      "line": 5
+    }
+  ],
+  "ref": "main"
+}
