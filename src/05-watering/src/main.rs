@@ -86,9 +86,9 @@ async fn calibrate_sensor(adc: &mut Saadc<'_, 1>, button: &mut Input<'static>) -
 }
 
 /// For this particular sensor:
+/// Lower numbers indicate more moisture
 /// - ~2840: Very dry (in air/dry soil)
 /// - ~1180: Very wet (submerged in water)
-/// Lower numbers indicate more moisture
 async fn read_moisture(adc: &mut Saadc<'_, 1>) -> i16 {
     let mut buf = [0i16; 1];
     adc.sample(&mut buf).await;
