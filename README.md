@@ -74,3 +74,7 @@ embassy-time = { version = "0.3.2", features = [
 microbit-bsp = "0.3.0"
 embassy-futures = "0.1.1"
 ```
+
+## Nice to haves
+
+Non-volatile memory controller

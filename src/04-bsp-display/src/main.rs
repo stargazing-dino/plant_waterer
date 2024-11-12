@@ -28,7 +28,6 @@ async fn main(_spawner: Spawner) {
         .await
         {
             Either::First(_) => {
-                // Scroll completed, restart it
                 defmt::info!("Scroll completed, restarting...");
             }
             Either::Second(Either::First(_)) => {
