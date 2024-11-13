@@ -26,11 +26,10 @@ embassy-nrf = { version = "0.2.0", features = [
     "defmt",
     "nrf52833",
     "time-driver-rtc1",
-    "gpiote",
     "unstable-pac",
     "time",
 ] }
-embassy-executor = { version = "0.6.2", features = [
+embassy-executor = { version = "0.6.3", features = [
     "arch-cortex-m",
     "executor-thread",
     "defmt",
