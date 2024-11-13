@@ -11,6 +11,16 @@ impl<'a> Debouncer<'a> {
         Self { input, debounce }
     }
 
+    /// Debounces the input signal by waiting for a stable level.
+    ///
+    /// This method continuously checks the input level and waits for any edge.
+    /// After detecting an edge, it waits for the specified debounce duration
+    /// and checks the input level again. If the level has changed, it returns
+    /// the new level.
+    ///
+    /// # Returns
+    ///
+    /// * `Level` - The stable level of the input signal after debouncing.
     pub async fn debounce(&mut self) -> Level {
         loop {
             let l1 = self.input.get_level();

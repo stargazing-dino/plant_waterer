@@ -19,8 +19,8 @@ bind_interrupts!(struct Irqs {
     SAADC => saadc::InterruptHandler;
 });
 
-const MEASUREMENT_INTERVAL: Duration = Duration::from_secs(5);
-const WATERING_DURATION: Duration = Duration::from_secs(1);
+const MEASUREMENT_INTERVAL: Duration = Duration::from_secs(10);
+const WATERING_DURATION: Duration = Duration::from_secs(5);
 const DEFAULT_THRESHOLD: i16 = 2000;
 const THRESHOLD_BUFFER: i16 = 100;
 
@@ -50,6 +50,8 @@ async fn main(spawner: Spawner) {
     let button_a = Debouncer::new(button_a, Duration::from_millis(20));
 
     let button_b = Input::new(p.P0_23.degrade(), Pull::Up);
+    let button_b = Debouncer::new(button_b, Duration::from_millis(20));
+
     let pump_control = Output::new(p.P0_03.degrade(), Level::Low, OutputDrive::Standard);
 
     // Setup for the SAADC peripheral
@@ -77,19 +79,11 @@ async fn button_a_task(mut button: Debouncer<'static>) {
 }
 
 #[embassy_executor::task]
-async fn button_b_task(mut button: Input<'static>) {
+async fn button_b_task(mut button: Debouncer<'static>) {
     let sender = CHANNEL.sender();
     loop {
-        button.wait_for_low().await;
-        // Add debounce delay
-        embassy_time::Timer::after(Duration::from_millis(50)).await;
-        if button.is_low() {
-            button.wait_for_high().await;
-            embassy_time::Timer::after(Duration::from_millis(50)).await;
-            if button.is_high() {
-                sender.send(Event::Calibrate).await;
-            }
-        }
+        button.debounce().await;
+        sender.send(Event::Calibrate).await;
     }
 }
 
@@ -110,7 +104,7 @@ async fn control_task(mut pump_control: Output<'static>, mut saadc: Saadc<'stati
     let receiver = CHANNEL.receiver();
 
     // Start with a default threshold
-    let mut threshold = DEFAULT_THRESHOLD;
+    let mut moisture_threshold = DEFAULT_THRESHOLD;
     let mut system_state = SystemState::Idle;
 
     // https://www.youtube.com/watch?v=z-0-bbc80JM
@@ -137,7 +131,7 @@ async fn control_task(mut pump_control: Output<'static>, mut saadc: Saadc<'stati
                 let reading = read_moisture(&mut saadc).await;
                 defmt::info!("Moisture reading: {}", reading);
 
-                if reading > threshold {
+                if reading > moisture_threshold {
                     defmt::info!("Soil is dry, watering");
                     pump_control.set_high();
                     embassy_time::Timer::after(WATERING_DURATION).await;
@@ -155,8 +149,11 @@ async fn control_task(mut pump_control: Output<'static>, mut saadc: Saadc<'stati
                 let dry_reading = read_moisture(&mut saadc).await;
                 defmt::info!("Dry reading: {}", dry_reading);
 
-                threshold = dry_reading - THRESHOLD_BUFFER;
-                defmt::info!("Calibration complete. New threshold: {}", threshold);
+                moisture_threshold = dry_reading - THRESHOLD_BUFFER;
+                defmt::info!(
+                    "Calibration complete. New threshold: {}",
+                    moisture_threshold
+                );
                 SystemState::Idle
             }
 
@@ -167,9 +164,9 @@ async fn control_task(mut pump_control: Output<'static>, mut saadc: Saadc<'stati
 }
 
 /// For this particular sensor:
+/// Lower numbers indicate more moisture
 /// - ~2840: Very dry (in air/dry soil)
 /// - ~1180: Very wet (submerged in water)
-/// Lower numbers indicate more moisture
 async fn read_moisture(adc: &mut Saadc<'_, 1>) -> i16 {
     let mut buf = [0i16; 1];
     adc.sample(&mut buf).await;
