@@ -6,6 +6,7 @@ members = [
     "src/03-bsp-audio",
     "src/04-bsp-display",
     "src/05-watering",
+    "src/06-ble",
 ]
 
 [workspace.package]

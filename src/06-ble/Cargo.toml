@@ -1,0 +1,24 @@
+[package]
+name = "ble"
+version = "0.1.0"
+edition = "2021"
+
+
+[dependencies]
+cortex-m = { workspace = true }
+cortex-m-rt = { workspace = true }
+panic-probe = { workspace = true }
+defmt = { workspace = true }
+defmt-rtt = { workspace = true }
+microbit-bsp = { workspace = true }
+embassy-executor = { workspace = true }
+embassy-time = { workspace = true }
+embassy-futures = { workspace = true }
+nrf-softdevice = { version = "0.1.0", features = [
+    "defmt",
+    "nrf52833",
+    "s140",
+    "ble-peripheral",
+    "ble-gatt-server",
+    "evt-max-size-512",
+] }
