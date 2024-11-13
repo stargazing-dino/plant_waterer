@@ -6,6 +6,7 @@ members = [
     "src/03-bsp-audio",
     "src/04-bsp-display",
     "src/05-watering",
+    "src/06-state-machine-watering",
 ]
 
 [workspace.package]
@@ -43,3 +44,6 @@ embassy-futures = "0.1.1"
 
 # bsp dependencies
 microbit-bsp = { git = "https://github.com/lulf/microbit-bsp.git" }
+
+# channels, mutexes
+embassy-sync = { version = "0.6.0", features = ["defmt"] }
