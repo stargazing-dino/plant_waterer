@@ -1,9 +1,6 @@
 use nrf_softdevice::{
-    ble::{
-        advertisement_builder::{
-            Flag, LegacyAdvertisementBuilder, LegacyAdvertisementPayload, ServiceList,
-        },
-        gatt_server, peripheral,
+    ble::advertisement_builder::{
+        Flag, LegacyAdvertisementBuilder, LegacyAdvertisementPayload, ServiceList,
     },
     Softdevice,
 };
@@ -42,49 +39,4 @@ pub struct Server {
 #[embassy_executor::task]
 pub async fn softdevice_task(sd: &'static Softdevice) -> ! {
     sd.run().await
-}
-
-#[embassy_executor::task]
-pub async fn ble_server_task(
-    softdevice: &'static Softdevice,
-    server_handle: &'static ServerHandle,
-    connectable_advertisement: peripheral::ConnectableAdvertisement<'static>,
-    config: peripheral::Config,
-) {
-    loop {
-        let connection =
-            match peripheral::advertise_connectable(softdevice, connectable_advertisement, &config)
-                .await
-            {
-                Ok(connection) => connection,
-                Err(error) => {
-                    defmt::info!("Failed to establish connection: {:?}", error);
-                    continue;
-                }
-            };
-
-        defmt::info!("Connection established");
-
-        let disconnected_error =
-            gatt_server::run(&connection, &server_handle.server, |server_event| {
-                match server_event {
-                    ServerEvent::PlantService(event) => match event {
-                        PlantServiceEvent::PumpControlWrite(value) => {
-                            // Turn pump on if value is non-zero
-                            (server_handle.pump_callback)(value != 0);
-                            defmt::info!("Pump control set to: {}", value);
-                        }
-                        PlantServiceEvent::MoistureLevelCccdWrite { notifications } => {
-                            defmt::info!("Moisture level notifications: {}", notifications);
-                        }
-                    },
-                }
-            })
-            .await;
-
-        defmt::info!(
-            "gatt_server run exited with error: {:?}",
-            disconnected_error
-        );
-    }
 }
