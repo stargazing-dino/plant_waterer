@@ -18,6 +18,8 @@ bind_interrupts!(struct Irqs {
 const MEASUREMENT_INTERVAL: Duration = Duration::from_secs(10);
 const WATERING_DURATION: Duration = Duration::from_secs(5);
 
+const THRESHOLD_BUFFER: i16 = 100;
+
 #[embassy_executor::main]
 async fn main(_spawner: Spawner) {
     let mut p = embassy_nrf::init(Default::default());
@@ -34,8 +36,7 @@ async fn main(_spawner: Spawner) {
     let dry_reading = calibrate_sensor(&mut saadc, &mut button).await;
 
     // We want something a little less than the dry reading to trigger watering
-    let offset = 100;
-    let moisture_threshold = dry_reading - offset;
+    let moisture_threshold = dry_reading - THRESHOLD_BUFFER;
 
     loop {
         let button_press = button.wait_for_low();

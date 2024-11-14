@@ -2,7 +2,7 @@
 #![no_main]
 
 use embassy_executor::Spawner;
-use embassy_futures::select::{select, Either};
+use embassy_futures::select::{select3, Either3};
 use embassy_time::Duration;
 use microbit_bsp::*;
 use {defmt_rtt as _, panic_probe as _};
@@ -20,23 +20,20 @@ async fn main(_spawner: Spawner) {
 
     loop {
         let scroll_future = display.scroll("Hello, World!");
+        let button_a_future = btn_a.wait_for_low();
+        let button_b_future = btn_b.wait_for_low();
 
-        match select(
-            scroll_future,
-            select(btn_a.wait_for_low(), btn_b.wait_for_low()),
-        )
-        .await
-        {
-            Either::First(_) => {
+        match select3(scroll_future, button_a_future, button_b_future).await {
+            Either3::First(_) => {
                 defmt::info!("Scroll completed, restarting...");
             }
-            Either::Second(Either::First(_)) => {
+            Either3::Second(_) => {
                 defmt::info!("A pressed");
                 display
                     .display(display::fonts::ARROW_LEFT, Duration::from_secs(1))
                     .await;
             }
-            Either::Second(Either::Second(_)) => {
+            Either3::Third(_) => {
                 defmt::info!("B pressed");
                 display
                     .display(display::fonts::ARROW_RIGHT, Duration::from_secs(1))

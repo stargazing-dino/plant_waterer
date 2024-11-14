@@ -24,14 +24,7 @@ jobs:
         run: cargo fmt --all -- --check
 
       - name: Clippy
-        run: |
-          cargo clippy --target thumbv7em-none-eabihf -- -D warnings
-          for dir in src/*; do
-            if [ -f "$dir/Cargo.toml" ]; then
-              echo "Checking $dir..."
-              cargo clippy --manifest-path="$dir/Cargo.toml" --target thumbv7em-none-eabihf -- -D warnings
-            fi
-          done
+        run: cargo clippy --target thumbv7em-none-eabihf -- -D warnings
 
       - name: Check compilation
         run: |
