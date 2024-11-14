@@ -1,0 +1,148 @@
+<!doctype html>
+<html>
+    <head>
+        <title>Plant Watering Control</title>
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+                max-width: 800px;
+                margin: 0 auto;
+                padding: 20px;
+            }
+            button {
+                padding: 10px 20px;
+                margin: 5px;
+            }
+            .value-display {
+                font-size: 24px;
+                margin: 20px 0;
+            }
+            .controls {
+                margin: 20px 0;
+            }
+        </style>
+    </head>
+    <body>
+        <h1>Plant Watering Control</h1>
+
+        <button id="connectButton">Connect to Device</button>
+
+        <div class="controls">
+            <h2>Controls</h2>
+            <button id="startPump">Start Pump</button>
+            <button id="stopPump">Stop Pump</button>
+            <br />
+            <label for="threshold">Moisture Threshold:</label>
+            <input
+                type="number"
+                id="threshold"
+                min="0"
+                max="4095"
+                value="2000"
+            />
+            <button id="setThreshold">Set Threshold</button>
+        </div>
+
+        <div class="value-display">
+            <h2>Moisture Level: <span id="moistureValue">--</span></h2>
+        </div>
+
+        <script>
+            // UUIDs from the Rust code
+            const SERVICE_UUID = "12345678-1234-5678-1234-56789abcdef0";
+            const PUMP_CONTROL_UUID = "12345678-1234-5678-1234-56789abcdef1";
+            const MOISTURE_LEVEL_UUID = "12345678-1234-5678-1234-56789abcdef2";
+            const THRESHOLD_UUID = "12345678-1234-5678-1234-56789abcdef3";
+
+            let device = null;
+            let server = null;
+            let service = null;
+
+            async function connect() {
+                try {
+                    device = await navigator.bluetooth.requestDevice({
+                        filters: [{ name: "planty" }],
+                        optionalServices: [SERVICE_UUID],
+                    });
+
+                    server = await device.gatt.connect();
+                    service = await server.getPrimaryService(SERVICE_UUID);
+
+                    // Set up moisture level notifications
+                    const moistureChar =
+                        await service.getCharacteristic(MOISTURE_LEVEL_UUID);
+                    await moistureChar.startNotifications();
+                    moistureChar.addEventListener(
+                        "characteristicvaluechanged",
+                        (event) => {
+                            const value = event.target.value.getUint16(0, true);
+                            document.getElementById(
+                                "moistureValue",
+                            ).textContent = value;
+                        },
+                    );
+
+                    document.getElementById("connectButton").textContent =
+                        "Connected";
+                    enableControls(true);
+                } catch (error) {
+                    console.error("Connection error:", error);
+                    alert("Connection failed: " + error);
+                }
+            }
+
+            async function controlPump(start) {
+                try {
+                    const pumpChar =
+                        await service.getCharacteristic(PUMP_CONTROL_UUID);
+                    await pumpChar.writeValue(new Uint8Array([start ? 1 : 0]));
+                } catch (error) {
+                    console.error("Pump control error:", error);
+                    alert("Pump control failed: " + error);
+                }
+            }
+
+            async function setThreshold() {
+                try {
+                    const value = parseInt(
+                        document.getElementById("threshold").value,
+                    );
+                    const thresholdChar =
+                        await service.getCharacteristic(THRESHOLD_UUID);
+                    const buffer = new Uint16Array([value]);
+                    await thresholdChar.writeValue(buffer);
+                } catch (error) {
+                    console.error("Threshold set error:", error);
+                    alert("Setting threshold failed: " + error);
+                }
+            }
+
+            function enableControls(enabled) {
+                const controls = [
+                    "startPump",
+                    "stopPump",
+                    "threshold",
+                    "setThreshold",
+                ];
+                controls.forEach((id) => {
+                    document.getElementById(id).disabled = !enabled;
+                });
+            }
+
+            // Initialize
+            document
+                .getElementById("connectButton")
+                .addEventListener("click", connect);
+            document
+                .getElementById("startPump")
+                .addEventListener("click", () => controlPump(true));
+            document
+                .getElementById("stopPump")
+                .addEventListener("click", () => controlPump(false));
+            document
+                .getElementById("setThreshold")
+                .addEventListener("click", setThreshold);
+            enableControls(false);
+        </script>
+    </body>
+</html>
