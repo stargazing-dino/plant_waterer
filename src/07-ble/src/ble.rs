@@ -22,20 +22,21 @@ pub static SCAN_DATA: LegacyAdvertisementPayload = LegacyAdvertisementBuilder::n
     .build();
 
 #[nrf_softdevice::gatt_service(uuid = "12345678-1234-5678-1234-56789abcdef0")]
-pub struct KeyValueService {
+pub struct PlantService {
     #[characteristic(
         uuid = "12345678-1234-5678-1234-56789abcdef1",
         write,
-        write_without_response,
-        read,
-        notify
+        write_without_response
     )]
-    pub command: [u8; 512],
+    pub pump_control: u8,
+
+    #[characteristic(uuid = "12345678-1234-5678-1234-56789abcdef2", read, notify)]
+    pub moisture_level: u16,
 }
 
 #[nrf_softdevice::gatt_server]
 pub struct Server {
-    pub key_value_service: KeyValueService,
+    pub plant_service: PlantService,
 }
 
 #[embassy_executor::task]
@@ -46,12 +47,11 @@ pub async fn softdevice_task(sd: &'static Softdevice) -> ! {
 #[embassy_executor::task]
 pub async fn ble_server_task(
     softdevice: &'static Softdevice,
-    server: Server,
+    server_handle: &'static ServerHandle,
     connectable_advertisement: peripheral::ConnectableAdvertisement<'static>,
     config: peripheral::Config,
 ) {
     loop {
-        // Start advertising and wait for a connection
         let connection =
             match peripheral::advertise_connectable(softdevice, connectable_advertisement, &config)
                 .await
@@ -65,23 +65,20 @@ pub async fn ble_server_task(
 
         defmt::info!("Connection established");
 
-        // Run the GATT server
         let disconnected_error =
-            gatt_server::run(&connection, &server, |server_event| match server_event {
-                ServerEvent::KeyValueService(event) => match event {
-                    KeyValueServiceEvent::CommandWrite(data) => {
-                        if let Some(response) = handle_command(&data) {
-                            // Send the response as a notification
-                            if let Err(e) = server
-                                .key_value_service
-                                .command_notify(&connection, &pad_value::<512>(&response))
-                            {
-                                defmt::info!("Failed to send response: {:?}", e);
-                            }
+            gatt_server::run(&connection, &server_handle.server, |server_event| {
+                match server_event {
+                    ServerEvent::PlantService(event) => match event {
+                        PlantServiceEvent::PumpControlWrite(value) => {
+                            // Turn pump on if value is non-zero
+                            (server_handle.pump_callback)(value != 0);
+                            defmt::info!("Pump control set to: {}", value);
                         }
-                    }
-                    _ => {}
-                },
+                        PlantServiceEvent::MoistureLevelCccdWrite { notifications } => {
+                            defmt::info!("Moisture level notifications: {}", notifications);
+                        }
+                    },
+                }
             })
             .await;
 
