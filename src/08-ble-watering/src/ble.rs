@@ -29,13 +29,6 @@ pub struct PlantService {
 
     #[characteristic(uuid = "12345678-1234-5678-1234-56789abcdef2", read, notify)]
     pub moisture_level: u16,
-
-    #[characteristic(
-        uuid = "12345678-1234-5678-1234-56789abcdef3",
-        write,
-        write_without_response
-    )]
-    pub threshold: u16,
 }
 
 #[nrf_softdevice::gatt_server]

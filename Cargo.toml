@@ -8,6 +8,7 @@ members = [
     "src/05-watering",
     "src/06-state-machine-watering",
     "src/07-ble",
+    "src/08-ble-watering",
 ]
 
 [workspace.package]

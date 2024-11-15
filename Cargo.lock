@@ -77,6 +77,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "ble-watering"
+version = "0.1.0"
+dependencies = [
+ "cortex-m",
+ "cortex-m-rt",
+ "defmt",
+ "defmt-rtt",
+ "embassy-executor",
+ "embassy-futures",
+ "embassy-nrf",
+ "embassy-sync 0.6.0",
+ "embassy-time",
+ "microbit-bsp",
+ "nrf-softdevice",
+ "panic-probe",
+]
+
+[[package]]
 name = "bsp-audio"
 version = "0.1.0"
 dependencies = [

@@ -1,18 +1,26 @@
 #![no_std]
 #![no_main]
 
+extern crate alloc;
+use core::cell::RefCell;
+
 use ble::{softdevice_task, PlantServiceEvent, Server, ServerEvent, ADV_DATA, SCAN_DATA};
 use defmt::unwrap;
 use embassy_executor::Spawner;
 use embassy_nrf::{
     bind_interrupts,
-    gpio::{Input, Level, Output, OutputDrive, Pull},
+    gpio::{Input, Level, Output, OutputDrive, Pin as _, Pull},
     saadc::{self, ChannelConfig, Config, Saadc},
 };
-use embassy_sync::{blocking_mutex::raw::ThreadModeRawMutex, channel::Channel, signal::Signal};
+use embassy_sync::{
+    blocking_mutex::raw::{CriticalSectionRawMutex, ThreadModeRawMutex},
+    channel::Channel,
+    mutex::Mutex,
+    signal::Signal,
+};
 use embassy_time::Duration;
 use nrf_softdevice::{
-    ble::{gatt_server, peripheral},
+    ble::{gatt_server, peripheral, Connection},
     Softdevice,
 };
 use {defmt_rtt as _, panic_probe as _};
@@ -29,13 +37,22 @@ const WATERING_DURATION: Duration = Duration::from_secs(5);
 const DEFAULT_THRESHOLD: u16 = 2000;
 const THRESHOLD_BUFFER: u16 = 100;
 
+enum ConnectionState {
+    Connected(Connection),
+    Disconnected,
+}
+
+static SERVER: Mutex<CriticalSectionRawMutex, RefCell<Option<Server>>> =
+    Mutex::new(RefCell::new(None));
+
+static CONNECTION_STATE: Signal<ThreadModeRawMutex, ConnectionState> = Signal::new();
+
 #[derive(Debug, PartialEq)]
 enum Event {
     Water,
     WateringComplete,
     Measure,
     Calibrate,
-    SetThreshold(u16),
 }
 
 #[derive(Debug, PartialEq)]
@@ -68,7 +85,7 @@ async fn measurement_task() {
 }
 
 #[embassy_executor::task]
-async fn ble_task(server: Server, softdevice: &'static Softdevice) {
+async fn ble_task(softdevice: &'static Softdevice) {
     let config = peripheral::Config::default();
     let sender = CHANNEL.sender();
 
@@ -91,36 +108,35 @@ async fn ble_task(server: Server, softdevice: &'static Softdevice) {
         };
 
         defmt::info!("Connection established");
+        CONNECTION_STATE.signal(ConnectionState::Connected(connection.clone()));
+        let server_guard = SERVER.lock().await;
+        let server_ref = server_guard.borrow();
 
-        let _disconnected = gatt_server::run(&connection, &server, |event| match event {
-            ServerEvent::PlantService(evt) => match evt {
-                PlantServiceEvent::PumpControlWrite(value) => {
-                    if value > 0 {
-                        sender.blocking_send(Event::Water);
-                    } else {
-                        sender.blocking_send(Event::WateringComplete);
+        if let Some(ref server) = server_ref.as_ref() {
+            let _disconnected = gatt_server::run(&connection, *server, |event| match event {
+                ServerEvent::PlantService(evt) => match evt {
+                    PlantServiceEvent::PumpControlWrite(value) => {
+                        if value > 0 {
+                            sender.send(Event::Water);
+                        } else {
+                            sender.send(Event::WateringComplete);
+                        }
                     }
-                }
-                PlantServiceEvent::MoistureLevelCccdWrite { notifications: _ } => {}
-                PlantServiceEvent::ThresholdWrite(value) => {
-                    sender.blocking_send(Event::SetThreshold(value));
-                }
-            },
-        })
-        .await;
+                    PlantServiceEvent::MoistureLevelCccdWrite { notifications: _ } => {}
+                },
+            })
+            .await;
+        }
 
+        CONNECTION_STATE.signal(ConnectionState::Disconnected);
         defmt::info!("Disconnected");
     }
 }
 
 #[embassy_executor::task]
-async fn control_task(
-    mut pump_control: Output<'static>,
-    mut saadc: Saadc<'static, 1>,
-    server: &'static Server,
-) {
+async fn control_task(mut pump_control: Output<'static>, mut saadc: Saadc<'static, 1>) {
     let receiver = CHANNEL.receiver();
-    let mut moisture_threshold = DEFAULT_THRESHOLD;
+    let moisture_threshold = DEFAULT_THRESHOLD;
     let mut system_state = SystemState::Idle;
 
     loop {
@@ -141,8 +157,18 @@ async fn control_task(
                 let reading = read_moisture(&mut saadc).await;
                 defmt::info!("Moisture reading: {}", reading);
 
-                // Update BLE characteristic
-                unwrap!(server.plant_service.moisture_level.write(reading));
+                // Update BLE characteristic if connected
+                if let ConnectionState::Connected(ref connection) = CONNECTION_STATE.wait().await {
+                    let server_guard = SERVER.lock().await;
+                    let mut server_ref = server_guard.borrow_mut();
+
+                    if let Some(ref mut server) = server_ref.as_mut() {
+                        server
+                            .plant_service
+                            .moisture_level_notify(connection, &reading)
+                            .unwrap();
+                    }
+                }
                 MOISTURE_SIGNAL.signal(reading);
 
                 if reading > moisture_threshold {
@@ -152,11 +178,6 @@ async fn control_task(
                     pump_control.set_low();
                     defmt::info!("Automatic watering complete");
                 }
-                SystemState::Idle
-            }
-            (SystemState::Idle, Event::SetThreshold(new_threshold)) => {
-                defmt::info!("New threshold set: {}", new_threshold);
-                moisture_threshold = new_threshold;
                 SystemState::Idle
             }
             (current_state, _) => current_state,
@@ -171,7 +192,12 @@ async fn main(spawner: Spawner) {
     // Initialize softdevice
     let softdevice_config = nrf_softdevice::Config::default();
     let softdevice = Softdevice::enable(&softdevice_config);
-    let server = unwrap!(Server::new(softdevice));
+
+    // set global SERVER
+    SERVER
+        .lock()
+        .await
+        .replace(Some(unwrap!(Server::new(softdevice))));
 
     // Initialize hardware
     let button = Input::new(p.P0_14.degrade(), Pull::Up);
@@ -182,19 +208,15 @@ async fn main(spawner: Spawner) {
     // Setup SAADC
     let mut config = Config::default();
     config.resolution = saadc::Resolution::_12BIT;
-    let channel_config = ChannelConfig::single_ended(&mut p.P0_04);
+    let channel_config = ChannelConfig::single_ended(p.P0_04);
     let saadc = Saadc::new(p.SAADC, Irqs, config, [channel_config]);
-
-    // Make server static
-    let server = unwrap!(embassy_executor::ThreadModeMutex::new(server));
-    let server = unwrap!(Box::leak(Box::new(server)));
 
     // Spawn tasks
     unwrap!(spawner.spawn(softdevice_task(softdevice)));
-    unwrap!(spawner.spawn(ble_task(server.lock().await.clone(), softdevice)));
+    unwrap!(spawner.spawn(ble_task(softdevice)));
     unwrap!(spawner.spawn(button_task(button)));
     unwrap!(spawner.spawn(measurement_task()));
-    unwrap!(spawner.spawn(control_task(pump_control, saadc, server)));
+    unwrap!(spawner.spawn(control_task(pump_control, saadc)));
 }
 
 async fn read_moisture(adc: &mut Saadc<'_, 1>) -> u16 {
